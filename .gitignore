@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+# datos de quien lo usa desde el codigo
+ajustes.json
+palabras_usuario.json
+indicador_pos.json
+mando_generico.json
+foco_registro.txt
+# extra opcional que no es parte del programa
+modo_juego.py
+# compilacion
+.venv-construir/
+instalador/build/
+instalador/salida/
+nuitka-crash-report.xml

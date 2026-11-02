@@ -1,0 +1,45 @@
+TECLAMANDO - usa Windows con el mando, desde el sofá
+=====================================================
+
+Maneja el ratón, el navegador y YouTube con un mando de Xbox (o de PlayStation), y escribe
+con un teclado en pantalla al estilo de la PS3: tildes, ñ y palabras sugeridas que aprenden
+de lo que escribes.
+
+ENCENDERLO
+  Conecta el mando (cable o Bluetooth) y pulsa  Back + Start  a la vez.
+  En un mando de PlayStation:  Share + Options  (Create + Options en el de PS5).
+  Vibra corto = encendido. Vuelve a pulsarlos para pausarlo (vibra largo).
+  Si al instalar dejaste marcado "Arrancar con Windows", ya queda esperando al iniciar sesión.
+  Si no, abre "Teclamando" en el menú Inicio (enciende directamente).
+
+LO BÁSICO
+  Stick izquierdo   mover el cursor          A   clic          RT  clic derecho
+  Stick derecho     scroll                   B   atrás         LT  cursor lento (precisión)
+  Start             Enter                    L3  abrir el teclado en pantalla
+  Back + R3         ver la guía con todos los botones (LB / RB cambian de página)
+  Al hacer clic en un campo de texto, el teclado se abre solo.
+
+OTRO MANDO (PlayStation, genérico USB)
+  Los de Xbox funcionan tal cual. Si un botón de otro mando no hace lo que debería, abre en el
+  menú Inicio "Teclamando > Configurar otro mando" y pulsa cada botón que te pida
+  (Espacio = tu mando no tiene ese botón).
+  Si usas Steam: con Steam abierto y "Steam Input" activado para PlayStation, Steam se queda
+  con el mando. Desactívalo en Steam > Configuración > Mando.
+
+SI UN BOTÓN HACE DOS COSAS (menú Inicio, barra de tareas)
+  Windows 11 trae su propia navegación con mando (A = Enter, B = Esc, cruceta = flechas) que
+  actúa a la vez que Teclamando. El instalador ofrece apagarla (casilla opcional, pide permiso
+  de administrador y reiniciar). También puedes hacerlo después con extras\desactivar_navegacion_windows.reg
+  (doble clic y reiniciar) y deshacerlo con extras\restaurar_navegacion_windows.reg.
+  El botón Xbox del centro abre la Xbox Game Bar: Teclamando no lo usa. Si te molesta, apágalo en
+  Configuración > Juegos > Xbox Game Bar.
+
+DETENERLO
+  Menú Inicio > Teclamando > Detener Teclamando, o desinstálalo desde Configuración > Aplicaciones.
+
+TUS DATOS
+  Todo queda en tu PC: %APPDATA%\Teclamando (velocidades, posición de la mini ventana y las
+  palabras que el teclado aprende). Nada se envía a internet. Desinstalar no borra esa carpeta.
+
+Software libre (licencia MIT). Sin relación con Microsoft, Sony ni Valve; Xbox y PlayStation
+son marcas de sus dueños.

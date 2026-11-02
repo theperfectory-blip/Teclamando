@@ -1,0 +1,4 @@
+Windows Registry Editor Version 5.00
+
+; Deshace desactivar_navegacion_windows.reg (vuelve el comportamiento original de Windows). Reiniciar despues.
+[-HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Input\Settings\ControllerProcessor\ControllerToVKMapping]

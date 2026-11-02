@@ -1,0 +1,7 @@
+Windows Registry Editor Version 5.00
+
+; Apaga la navegacion nativa de Windows 11 con el mando (A=Enter, B=Esc, cruceta=flechas en Inicio,
+; barra de tareas, iconos ocultos, volumen...). Evita la doble entrada con mando_raton.py.
+; Arreglo comunitario, no documentado por Microsoft. Requiere reiniciar Windows.
+[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Input\Settings\ControllerProcessor\ControllerToVKMapping]
+"Enabled"=dword:00000000
