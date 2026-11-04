@@ -8,7 +8,7 @@ de lo que escribes.
 ENCENDERLO
   Conecta el mando (cable o Bluetooth) y pulsa  Back + Start  a la vez.
   En un mando de PlayStation:  Share + Options  (Create + Options en el de PS5).
-  Vibra corto = encendido. Vuelve a pulsarlos para pausarlo (vibra largo).
+  Vibra corto = encendido (también los de PlayStation). Vuelve a pulsarlos para pausarlo (vibra largo).
   Si al instalar dejaste marcado "Arrancar con Windows", ya queda esperando al iniciar sesión.
   Si no, abre "Teclamando" en el menú Inicio (enciende directamente).
 

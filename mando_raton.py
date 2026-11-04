@@ -181,6 +181,9 @@ def combo(*vks):
 
 def vibrar(ms=120, fuerza=30000):
     if xinput is None or PUERTO is None:
+        if vibracion_ps.vibrar(fuerza):         # mando de PlayStation: vibra por HID
+            time.sleep(ms / 1000)
+            vibracion_ps.vibrar(0)
         return
     v = XINPUT_VIBRATION(fuerza, fuerza)
     xinput.XInputSetState(PUERTO, ctypes.byref(v))
@@ -200,6 +203,9 @@ def stick(x, y, zona, curva=CURVA):
 
 from teclado_ps3 import Teclado  # noqa: E402  (teclado propio)
 from mando_generico import MandoGenerico  # noqa: E402  (mandos que no son de Xbox)
+from vibracion_ps import VibracionPS  # noqa: E402  (vibración de DualShock 4 / DualSense)
+
+vibracion_ps = VibracionPS()
 
 
 class Ayudante:

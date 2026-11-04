@@ -4,7 +4,7 @@ rem Necesita: Python 3 (python.org) e Inno Setup 6. El compilador de C (Zig) lo 
 rem Resultado: instalador\salida\Teclamando-<version>-instalador.exe
 rem El extra personal modo_juego.py NUNCA entra en el .exe (--nofollow-import-to).
 setlocal
-set VERSION=1.0.0
+set VERSION=1.0.1
 cd /d "%~dp0.."
 
 if not exist .venv-construir\Scripts\python.exe (

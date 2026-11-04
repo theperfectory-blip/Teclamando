@@ -3,7 +3,7 @@
 ; Lo tuyo (ajustes, palabras aprendidas) queda en %APPDATA%\Teclamando y no se borra al desinstalar.
 
 #ifndef Version
-  #define Version "1.0.0"
+  #define Version "1.0.1"
 #endif
 #define Navegacion "HKLM\SOFTWARE\Microsoft\Input\Settings\ControllerProcessor\ControllerToVKMapping"
 
