@@ -101,6 +101,7 @@ VENTANA_FOCO = 1.5       # s tras el clic vigilando si un campo recibe el foco (
 REGISTRO_FOCO = rutas.datos("foco_registro.txt")
 ARCHIVO_AJUSTES = rutas.datos("ajustes.json")
 AYUDANTE = rutas.programa("vigilar_foco.ps1")
+RENOVAR_AYUDANTE = 20 * 60   # s: cada cuánto se relanza el ayudante de foco (si no hay nada pendiente)
 
 # ---------- Windows ----------
 class XINPUT_GAMEPAD(ctypes.Structure):
@@ -218,10 +219,12 @@ class Ayudante:
         self.cambio_t = 0.0       # instante del último cambio de foco
         self.historia = collections.deque(maxlen=12)   # (instante, línea) de los últimos cambios
         self.proceso = None
+        self.inicio_t = 0.0       # cuándo se lanzó el ayudante actual
         if arrancar:
             self.arrancar()
 
     def arrancar(self):
+        self.inicio_t = time.monotonic()
         try:
             self.proceso = subprocess.Popen(
                 ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", AYUDANTE,
@@ -235,6 +238,19 @@ class Ayudante:
 
     def vivo(self):
         return self.proceso is not None and self.proceso.poll() is None
+
+    def renovar(self):
+        """Cerrar el ayudante y lanzar uno nuevo. UI Automation se queda pegada en un proceso que
+        lleva horas (sobre todo tras suspender el PC): seguía diciendo "la página" con el foco en un
+        buscador, y el teclado dejó de abrirse solo (2026-11-04)."""
+        if self.vivo():
+            try:
+                self.proceso.terminate()
+            except OSError:
+                pass
+        self.foco_texto = False
+        self.campo = None
+        self.arrancar()
 
     def punto(self, x, y):
         """Avisa de un clic: si el foco no quedó en un campo de texto pero debajo del clic hay uno
@@ -750,14 +766,19 @@ class Mando(modo_juego.ModoJuego if modo_juego else SinJuego):
         estado = XINPUT_STATE()
         periodo = 1.0 / HZ
         proxima_revision = 0.0
+        ciclo_previo = time.monotonic()
         proximo_juego = 0.0
         juego_al_frente = False
         while True:
             ahora = time.monotonic()
+            suspendido = ahora - ciclo_previo > 30    # el PC estuvo suspendido (el bucle no corrió)
+            ciclo_previo = ahora
             if ahora >= proxima_revision:
                 proxima_revision = ahora + 5
                 if self.activo and not self.ayudante.vivo():
                     self.ayudante.arrancar()
+                elif self.activo and (suspendido or ahora - self.ayudante.inicio_t > RENOVAR_AYUDANTE)                         and self.foco_clic is None and not self.teclado.visible:
+                    self.ayudante.renovar()
                 if self.activo:
                     self.mostrar_indicador(True)   # vuelve a abrirlo si se cerró
                 self.generico.recargar_si_cambio()
