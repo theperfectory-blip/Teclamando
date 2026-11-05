@@ -41,7 +41,7 @@ Hace falta Python 3 e [Inno Setup 6](https://jrsoftware.org/isinfo.php); el comp
 instalador\construir.bat
 ```
 
-Sin compilar también funciona: `pythonw teclamando.py` (solo usa la biblioteca estándar).
+Sin compilar también funciona: `pythonw teclamando.py` (solo usa la biblioteca estándar). Para configurar otro mando sin compilar: `pythonw teclamando.py --configurar`.
 
 ## Créditos
 
