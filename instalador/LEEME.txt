@@ -24,7 +24,7 @@ OTRO MANDO (PlayStation, genérico USB)
   menú Inicio "Teclamando > Configurar otro mando" y pulsa cada botón que te pida
   (Espacio = tu mando no tiene ese botón).
   Más rápido: si conectas un mando genérico que Teclamando no conoce, la mini ventana se despliega
-  sola y te lo pide (también manteniendo Back + R3 durante 10 segundos). Si en 8 segundos no pulsas
+  sola y te lo pide (también manteniendo Back + R3 durante 3 segundos). Si en 8 segundos no pulsas
   el botón que toca, lo salta. Cada modelo de mando guarda su propia configuración.
   Si usas Steam: con Steam abierto y "Steam Input" activado para PlayStation, Steam se queda
   con el mando. Desactívalo en Steam > Configuración > Mando.

@@ -93,7 +93,7 @@ REPETIR_CADA = 0.08
 TECLADO_ESPERA = 0.23     # repetición al moverse por el teclado (50 % más rápida, pedido 2026-10-27)
 TECLADO_CADA = 0.087
 TECLADO_ARRASTRE = 1600   # px/s con el stick derecho a fondo (mover el teclado)
-CONFIGURAR_MANTENER = 10.0   # s con Back + R3 apretados = configurar el mando (mini ventana)
+CONFIGURAR_MANTENER = 3.0   # s con Back + R3 apretados = configurar el mando (mini ventana)
 A_MANTENER = 0.6          # s con A quieta = abrir en pestaña nueva
 B_MANTENER = 1.0          # s con B = cerrar pestaña
 ESPERA_FOCO = 0.45        # s tras el clic: si el campo ya tenía el foco, abrir el teclado
@@ -887,20 +887,27 @@ class Mando(modo_juego.ModoJuego if modo_juego else SinJuego):
             nuevos = botones & ~self.previo
             soltados = self.previo & ~botones
 
-            # Back + R3 mantenidos 10 s: configurar el mando (mandos que no son de Xbox)
+            # Back + R3 mantenidos 3 s: configurar el mando (mandos que no son de Xbox)
             if self.activo and (botones & BACK) and (botones & R3):
                 if self.retener_t is None:
                     self.retener_t = ahora
                 elif (ahora - self.retener_t >= CONFIGURAR_MANTENER and PUERTO is None
                       and self.generico.indice is not None):
                     self.retener_t = ahora + 1e9      # una sola vez por pulsación
-                    self.cerrar_guia()                 # la guía se abrió con el primer toque
                     self.empezar_config(self.generico.indice, "manual")
                     self.soltar_todo()
                     self.consumidos = botones
                     self.previo = botones
                     continue
             else:
+                if self.retener_t is not None and self.retener_t <= ahora and self.activo:
+                    # soltaron Back + R3 sin llegar a configurar: abrir / cerrar la guía (al soltar, no al
+                    # apretar, para que al mantenerlos no se abra la guía antes de la configuración)
+                    self.alternar_guia()
+                    self.back_solo = self.start_solo = False
+                    self.soltar_todo()
+                    self.soltar_juego()
+                    vibrar(60, 20000)
                 self.retener_t = None
 
             # Back + Start: pausar / reanudar (en cualquier modo)
@@ -923,12 +930,10 @@ class Mando(modo_juego.ModoJuego if modo_juego else SinJuego):
 
             # Back + R3: abrir / cerrar la guía de botones (solo con el control activo)
             if self.activo and (botones & BACK) and (botones & R3) and (nuevos & (BACK | R3)):
-                self.alternar_guia()
-                self.back_solo = self.start_solo = False
+                self.back_solo = self.start_solo = False    # la guía se abre al soltarlos (arriba)
                 self.soltar_todo()
                 self.soltar_juego()
                 self.consumidos = botones
-                vibrar(60, 20000)
                 self.previo = botones
                 continue
 

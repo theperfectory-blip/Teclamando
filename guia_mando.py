@@ -69,7 +69,7 @@ COMBINACIONES = {   # Start (pulgar derecho) + mano izquierda · Back (pulgar iz
             (["Back", "+", "B"], "Esc", "", "B"),
             (["Back", "+", "Start"], "Encender / pausar", "", "Start"),
             (["Back", "+", "A"], "Reproducir / pausar", "", "A"),
-            (["Back", "+", "R3"], "Esta guía", "", "RS")],
+            (["Back", "+", "R3"], "Esta guía", "mantén 3 s: configurar mando", "RS")],
     "abajo": [(["Start"], "y"), (["Back"], "se mantienen mientras pulsas el otro botón")],
 }
 TECLADO = {

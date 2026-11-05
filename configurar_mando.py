@@ -87,6 +87,9 @@ class Aprendiz:
         """Un vistazo al mando. Devuelve True si el estado visible cambió (se detectó el botón)."""
         if self.terminado or self.paso >= len(PASOS):
             return False
+        # Lo que estaba apretado al empezar (p. ej. Back + R3 con que se abrió la configuración) deja de
+        # contar como "reposo" en cuanto se suelta; si no, nunca se vuelve al reposo y no se detecta nada.
+        self.reposo.dwButtons &= info.dwButtons
         clave = PASOS[self.paso][0]
         if self.esperando_soltar:
             if self.en_reposo(info):

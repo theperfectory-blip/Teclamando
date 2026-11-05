@@ -9,7 +9,7 @@ al pulsarla ahí vuelve a su sitio.
 Animaciones (solo en estos momentos, nunca en el uso diario; pedido 2026-11-05):
   - al encenderse: el anillo se llena cuadrante por cuadrante (2 s) y queda el del jugador 1;
   - al pausar (orden APAGAR): el anillo gira tres veces, como al apagar una Xbox 360, y se cierra;
-  - mando nuevo sin configurar (o Back + R3 mantenidos 10 s): el anillo se llena, la ventana se
+  - mando nuevo sin configurar (o Back + R3 mantenidos 3 s): el anillo se llena, la ventana se
     despliega hacia arriba y muestra el mando dibujado para enseñarle los botones uno por uno.
 Órdenes que recibe de mando_raton.py por stdin: CONECTADO, CONFIGURAR <joystick> [auto], APAGAR.
 Le dice a mando_raton.py por stdout: CONFIG 1 (empezó) / CONFIG 0 (terminó), para que el mando
@@ -24,6 +24,7 @@ import threading
 from ctypes import wintypes
 import time
 import tkinter as tk
+from tkinter import font as tkfont
 
 import configurar_mando as cfg
 import guia_mando as gm
@@ -191,7 +192,20 @@ PACIENCIA = 8.0                  # s sin pulsar el botón que toca: se salta
 DURACION_ANILLO = 2.0            # s de la animación del anillo
 DESPLIEGUE = 0.25                # s de abrir / cerrar hacia arriba
 MARGEN = 14                      # px de diseño alrededor del mando dibujado
+TITULO_ALTO = 30                 # px de diseño para el título de la parte desplegada
+TEXTO_ALTO = 76                  # px de diseño para lo que hay que hacer, bajo el mando
 MANDO_ANCHO, MANDO_ALTO = 508, 362   # lo que ocupa dibujar_cuerpo (de -18 a 344 en vertical)
+
+
+NOMBRES = {   # paso -> (nombre en Xbox, nombre en PlayStation)
+    "A": ("A", "✕"), "B": ("B", "○"), "X": ("X", "□"), "Y": ("Y", "△"),
+    "LB": ("LB", "L1"), "RB": ("RB", "R1"), "LT": ("LT", "L2"), "RT": ("RT", "R2"),
+    "BACK": ("Back", "Share"), "START": ("Start", "Options"), "L3": ("L3", "L3"), "R3": ("R3", "R3"),
+    "ARRIBA": ("Cruceta ↑", "Cruceta ↑"), "ABAJO": ("Cruceta ↓", "Cruceta ↓"),
+    "IZQUIERDA": ("Cruceta ←", "Cruceta ←"), "DERECHA": ("Cruceta →", "Cruceta →"),
+    "LX": ("LS →", "Stick izq. →"), "LY": ("LS ↑", "Stick izq. ↑"),
+    "RX": ("RS →", "Stick der. →"), "RY": ("RS ↑", "Stick der. ↑"),
+}
 
 
 def decir(texto):
@@ -235,7 +249,10 @@ class Mini:
         r.attributes("-alpha", OPACIDAD)       # vidrio: se ve lo de atrás, como en la PS3
         e = self.e = r.winfo_fpixels("1i") / 96
         self.W, self.H = round(ANCHO * e), round(ALTO * e)
-        self.extra = round((MANDO_ALTO * (ANCHO - 2 * MARGEN) / MANDO_ANCHO + 2 * MARGEN) * e)
+        self.extra = round((MANDO_ALTO * (ANCHO - 2 * MARGEN) / MANDO_ANCHO + 2 * MARGEN + TEXTO_ALTO + TITULO_ALTO) * e)
+        self.f_texto = tkfont.Font(family=gm.LETRA, size=-round(15 * e), weight="bold")
+        self.f_nota = tkfont.Font(family=gm.LETRA, size=-round(10.5 * e))
+        self.f_titulo = tkfont.Font(family=gm.LETRA, size=-round(17 * e), weight="bold")
         self.Ht = self.H                       # alto actual (crece al desplegar)
         self.sube = True                       # se despliega hacia arriba (abajo si no cabe)
         self.cv = tk.Canvas(r, width=self.W, height=self.H, bg=CLAVE, highlightthickness=0, cursor="fleur")
@@ -326,11 +343,38 @@ class Mini:
             hecho = c["ap"].captura is not None
         elif c and c["fin"]:
             hecho = True
+        self.dibujar_texto(yo)
         k = self.gm.k
         margen = MARGEN * self.e
         ox = margen / k
-        oy = (yo - self.extra + margen) / k + 18
+        oy = (yo - self.extra + TITULO_ALTO * self.e + margen) / k + 18
         gm.dibujar_cuerpo(self.cv, self.gm.px, self.gm, ox, oy, zona, direccion, hecho, etiqueta=False)
+
+    def dibujar_texto(self, yo):
+        """Título y qué hay que hacer ahora, en la parte desplegada."""
+        c = self.cfg
+        if not c:
+            return
+        e, W = self.e, self.W
+        ancho = W - 2 * MARGEN * e
+        alto = TEXTO_ALTO * e
+        y0 = yo - alto
+        self.cv.create_text(W / 2, yo - self.extra + TITULO_ALTO * e * 0.62, text="Configurar mando",
+                            fill=gm.TEXTO, font=self.f_titulo)
+        if c["fin"]:
+            self.cv.create_text(W / 2, y0 + alto / 2, text="Listo: mando configurado", fill=gm.LUZ,
+                                font=self.f_texto, width=ancho, justify="center")
+            return
+        ap = c["ap"]
+        if ap.paso >= len(cfg.PASOS):
+            return
+        xbox, ps = NOMBRES[cfg.PASOS[ap.paso][0]]
+        self.cv.create_text(W / 2, y0 + alto * 0.17, text="Xbox  " + xbox, fill=gm.TEXTO,
+                            font=self.f_texto, width=ancho, justify="center")
+        self.cv.create_text(W / 2, y0 + alto * 0.46, text="PlayStation  " + ps, fill=gm.EXTRA,
+                            font=self.f_texto, width=ancho, justify="center")
+        self.cv.create_text(W / 2, y0 + alto * 0.84, fill=gm.EXTRA, font=self.f_nota, width=ancho,
+                            text="Retroceso volver  ·  Espacio saltar  ·  Esc salir", justify="center")
 
     def poner(self):
         y = self.pos[1] - (self.Ht - self.H if self.sube else 0)
@@ -434,7 +478,7 @@ class Mini:
         ap = cfg.Aprendiz()
         ap.iniciar(indice)
         self.cfg = {"ap": ap, "auto": auto, "fin": False, "blink": 0.0, "t_paso": time.monotonic(),
-                    "paso": 0}
+                    "paso": 0, "teclas": {}}
         decir("CONFIG 1")
         self.encender(conservar=True, al_final=lambda: self.desplegar(True, self.empezar_pasos))
 
@@ -464,6 +508,20 @@ class Mini:
             self.terminar_config(False)
             return
         ahora = time.monotonic()
+        # teclado (la ventana no tiene el foco, se mira el estado de las teclas): Retroceso = volver un
+        # paso, Espacio = saltar, Esc = salir sin guardar
+        for vk in (0x08, 0x20, 0x1B):
+            abajo = bool(self.u.GetAsyncKeyState(vk) & 0x8000)
+            if abajo and not c["teclas"].get(vk):
+                if vk == 0x1B:
+                    self.terminar_config(False)
+                    return
+                if vk == 0x08:
+                    ap.atras()
+                elif not ap.terminado:
+                    ap.siguiente(None)
+                    ap.saltados_seguidos = 0
+            c["teclas"][vk] = abajo
         if ap.avanzar(info):
             self.dibujar()                                # lo detecté: el anillo se vuelve blanco
         if ap.terminado:
