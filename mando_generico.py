@@ -83,6 +83,14 @@ def rangos(indice):
     return r, caps.szPname
 
 
+def modelo(indice):
+    """Identificador del modelo de mando ("vid:pid" en hexadecimal) o "" si Windows no lo dice."""
+    caps = JOYCAPSW()
+    if winmm.joyGetDevCapsW(indice, ctypes.byref(caps), ctypes.sizeof(JOYCAPSW)) != 0:
+        return ""
+    return "%04x:%04x" % (caps.wMid, caps.wPid)
+
+
 def valor_eje(info, eje):
     return getattr(info, "dw%spos" % eje)
 
@@ -103,15 +111,45 @@ def pov_a_cruceta(pov):
     return bits
 
 
-def cargar_mapa():
+VID_PLAYSTATION = "054c"
+
+
+def _leer_archivo():
     try:
         with open(ARCHIVO_MAPA, encoding="utf-8") as f:
-            mapa = json.load(f)
-        if isinstance(mapa, dict) and "botones" in mapa and "ejes" in mapa:
-            return mapa
+            datos = json.load(f)
+        if isinstance(datos, dict):
+            return datos
     except (OSError, ValueError):
         pass
-    return MAPA_PS
+    return {}
+
+
+def cargar_mapa(clave=""):
+    """(mapa, conocido) del modelo `clave`. El archivo guarda un mapa por modelo ({"modelos": {...}});
+    el formato antiguo (un solo mapa para cualquier mando) vale para todos. Los PlayStation se
+    conocen de fábrica; un modelo sin mapa usa la distribución PlayStation pero NO es conocido
+    (Teclamando le ofrece configurarlo)."""
+    datos = _leer_archivo()
+    modelos = datos.get("modelos") if isinstance(datos.get("modelos"), dict) else {}
+    for k in (clave, "_general"):                       # "_general" = el mapa antiguo, vale para cualquiera
+        m = modelos.get(k) if k else None
+        if isinstance(m, dict) and "botones" in m and "ejes" in m:
+            return m, True
+    if "botones" in datos and "ejes" in datos:          # formato antiguo: un mapa para todos
+        return datos, True
+    return MAPA_PS, clave.startswith(VID_PLAYSTATION)
+
+
+def guardar_mapa(clave, mapa):
+    """Guarda el mapa de este modelo sin tocar los de otros mandos."""
+    datos = _leer_archivo()
+    modelos = datos["modelos"] if isinstance(datos.get("modelos"), dict) else {}
+    if "botones" in datos and "ejes" in datos and "_general" not in modelos:
+        modelos["_general"] = {k: datos[k] for k in ("botones", "gatillos", "ejes", "cruceta") if k in datos}
+    modelos[clave or "_general"] = mapa
+    with open(ARCHIVO_MAPA, "w", encoding="utf-8") as f:
+        json.dump({"modelos": modelos}, f, indent=2)
 
 
 def mapa_cambiado(mtime_anterior):
@@ -128,7 +166,8 @@ class MandoGenerico:
         self.indice = None
         self.rangos = {}
         self.nombre = ""
-        self.mapa = cargar_mapa()
+        self.modelo = ""
+        self.mapa, self.conocido = cargar_mapa()
         self.mtime = self._mtime()
 
     def _mtime(self):
@@ -140,7 +179,7 @@ class MandoGenerico:
     def recargar_si_cambio(self):
         """El configurador puede reescribir el mapa con el programa en marcha."""
         if mapa_cambiado(self.mtime):
-            self.mapa = cargar_mapa()
+            self.mapa, self.conocido = cargar_mapa(self.modelo)
             self.mtime = self._mtime()
 
     def buscar(self):
@@ -148,6 +187,9 @@ class MandoGenerico:
             if leer_crudo(i) is not None:
                 self.indice = i
                 self.rangos, self.nombre = rangos(i)
+                self.modelo = modelo(i)
+                self.mapa, self.conocido = cargar_mapa(self.modelo)
+                self.mtime = self._mtime()
                 return True
         self.indice = None
         return False

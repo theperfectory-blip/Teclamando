@@ -254,6 +254,141 @@ class Glifos:
         return sum(self.ancho(b) + self.px(8) for b in botones) - self.px(8)
 
 
+ZONAS = {   # lo que se resalta, relativo al mando: ("o", cx, cy, radio) o ("r", x1, y1, x2, y2)
+    "A": ("o", 385, 150, 22), "B": ("o", 417, 118, 22), "X": ("o", 353, 118, 22), "Y": ("o", 385, 86, 22),
+    "LS": ("o", 125, 118, 40), "L3": ("o", 125, 118, 40), "RS": ("o", 315, 205, 40), "R3": ("o", 315, 205, 40),
+    "BACK": ("o", 205, 112, 16), "START": ("o", 295, 112, 16),
+    "LB": ("r", 54, 8, 208, 46), "RB": ("r", 292, 8, 446, 46),
+    "LT": ("r", 92, -18, 168, 28), "RT": ("r", 332, -18, 408, 28),
+    "ARRIBA": ("r", 174, 178, 196, 201), "ABAJO": ("r", 174, 209, 196, 232),
+    "IZQUIERDA": ("r", 157, 194, 181, 216), "DERECHA": ("r", 189, 194, 213, 216),
+}
+
+
+def dibujar_cuerpo(cv, p, g, ox=None, oy=None, resaltar=None, direccion=None, hecho=False, etiqueta=True):
+    """El mando de Xbox 360 dibujado (lo usa la guía y el configurador de mandos). `ox, oy` = esquina
+    del dibujo en diseño; `resaltar` = clave de ZONAS que se rodea con el anillo de luz (blanco si
+    `hecho`); `direccion` = (dx, dy) flecha desde un stick (mover el stick hacia allá)."""
+    ox = MANDO_X if ox is None else ox
+    oy = MANDO_Y if oy is None else oy
+    
+    def pt(x, y):
+        return p(ox + x), p(oy + y)
+
+    def caja(x1, y1, x2, y2, r, relleno, borde=""):
+        a, b = pt(x1, y1)
+        c, d = pt(x2, y2)
+        g.redondo(a, b, c, d, p(r), relleno, borde)
+
+    def circulo(cx, cy, r, relleno, borde="", ancho=1):
+        a, b = pt(cx - r, cy - r)
+        c, d = pt(cx + r, cy + r)
+        cv.create_oval(a, b, c, d, fill=relleno, outline=borde, width=ancho)
+
+    def curva(inicio, tramos, dx=0, dy=0):
+        puntos = [inicio]
+        for tramo in tramos:
+            b = bezier([puntos[-1]] + list(tramo))
+            puntos += [(b[i], b[i + 1]) for i in range(0, len(b), 2)]
+        return [c for x, y in puntos for c in pt(x + dx, y + dy)]
+
+    def poligono(puntos, relleno, borde="", ancho=1, suave=True):
+        cv.create_polygon([c for x, y in puntos for c in pt(x, y)], fill=relleno, outline=borde,
+                          width=ancho, smooth=suave)
+
+    def stick(cx, cy):
+        circulo(cx, cy, 34, "#c4c8cf")                       # hueco en la carcasa
+        circulo(cx, cy + 2, 29, "#15171b")                   # sombra del capuchón
+        circulo(cx, cy, 29, "#2b2e35", "#454a54", max(1, p(3)))   # capuchón con su anillo de goma
+        circulo(cx, cy, 17, "#23262c")                       # centro cóncavo
+        a, b = pt(cx - 25, cy - 25)
+        c, d = pt(cx + 25, cy + 25)
+        cv.create_arc(a, b, c, d, start=100, extent=70, style="arc", outline="#5d6370", width=max(1, p(2)))
+
+    # gatillos detrás y bumpers curvos sobre los hombros
+    caja(95, -14, 165, 24, 14, "#3a3e46", "#4a4f59")
+    caja(335, -14, 405, 24, 14, "#3a3e46", "#4a4f59")
+    poligono([(58, 46), (66, 30), (96, 18), (150, 12), (196, 14), (204, 26), (198, 32), (150, 28),
+              (100, 34), (72, 46)], "#8d939d", "#a6abb4")
+    poligono([(442, 46), (434, 30), (404, 18), (350, 12), (304, 14), (296, 26), (302, 32), (350, 28),
+              (400, 34), (428, 46)], "#8d939d", "#a6abb4")
+    # sombra, cuerpo blanco y brillo de arriba
+    cv.create_polygon(curva((70, 40), CONTORNO, 0, 9), fill="#07080a", outline="")
+    cv.create_polygon(curva((70, 40), CONTORNO), fill="#eceef1", outline="#c9cdd4", width=max(1, p(1.5)))
+    cv.create_polygon(curva((70, 40), BRILLO), fill="#f8f9fa", outline="")
+    # empuñaduras un poco más oscuras abajo
+    poligono([(30, 250), (60, 236), (100, 262), (104, 312), (70, 336), (30, 320), (16, 286)], "#e2e5e9",
+             suave=True)
+    poligono([(470, 250), (440, 236), (400, 262), (396, 312), (430, 336), (470, 320), (484, 286)], "#e2e5e9",
+             suave=True)
+    # sticks y cruceta sobre su disco
+    stick(125, 118)
+    stick(315, 205)
+    circulo(185, 205, 33, "#c4c8cf")
+    circulo(185, 207, 28, "#15171b")
+    circulo(185, 205, 28, "#3a3e46", "#4c515b", max(1, p(2)))
+    caja(177, 182, 193, 228, 4, "#2b2e35")
+    caja(162, 197, 208, 213, 4, "#2b2e35")
+    for x1, y1, x2, y2, x3, y3 in ((185, 186, 181, 191, 189, 191), (185, 224, 181, 219, 189, 219),
+                                   (166, 205, 171, 201, 171, 209), (204, 205, 199, 201, 199, 209)):
+        cv.create_polygon(*pt(x1, y1), *pt(x2, y2), *pt(x3, y3), fill="#6b717d", outline="")
+    # Back y Start: redondos, con su flecha, a los lados del botón guía
+    for cx, flecha in ((205, -1), (295, 1)):
+        circulo(cx, 112, 11, "#c4c8cf")
+        circulo(cx, 112, 9, "#9aa0aa", "#80868f")
+        cv.create_polygon(*pt(cx - 4 * flecha, 108), *pt(cx - 4 * flecha, 116), *pt(cx + 4 * flecha, 112),
+                          fill="#2b2e35", outline="")
+    # botón guía plateado con el anillo de luz (cuadrante del jugador 1 encendido)
+    circulo(250, 94, 27, "#c4c8cf")
+    a, b = pt(227, 71)
+    c, d = pt(273, 117)
+    for inicio, color in ((5, "#8a909a"), (95, LUZ), (185, "#8a909a"), (275, "#8a909a")):
+        cv.create_arc(a, b, c, d, start=inicio, extent=80, style="arc", outline=color, width=max(2, p(4)))
+    circulo(250, 94, 17, "#d9dde3", "#aeb3bc", max(1, p(1.5)))
+    circulo(246, 90, 7, "#eef0f3")
+    # A B X Y: botones de color en su hueco, con brillo
+    for letra, (cx, cy) in {"Y": (385, 86), "X": (353, 118), "B": (417, 118), "A": (385, 150)}.items():
+        circulo(cx, cy, 17, "#c4c8cf")
+        circulo(cx, cy + 1.5, 14.5, "#15171b")
+        circulo(cx, cy, 14.5, COLOR[letra])
+        a, b = pt(cx - 9, cy - 11)
+        c, d = pt(cx + 3, cy - 4)
+        cv.create_oval(a, b, c, d, fill=aclarar(COLOR[letra], 0.5), outline="")
+        cv.create_text(*pt(cx, cy + 1), text=letra, fill=OSCURO, font=g.f_letra)
+
+    zona = ZONAS.get(resaltar)
+    if not zona:
+        return
+    color = "#ffffff" if hecho else LUZ
+    ancho = max(3, p(4))
+    if zona[0] == "o":
+        _, cx, cy, r = zona
+        circulo(cx, cy, r, "", color, ancho)
+        if direccion:
+            dx, dy = direccion
+            cv.create_line(*pt(cx + dx * 14, cy + dy * 14), *pt(cx + dx * (r + 40), cy + dy * (r + 40)),
+                           fill=color, width=max(4, p(6)), arrow=tk.LAST, arrowshape=(p(16), p(20), p(8)))
+        if direccion:
+            ex, ey, an = cx - r - 10, cy, "e"
+        elif resaltar in ("BACK", "START"):
+            ex, ey, an = cx, cy + r + 14, "center"
+        else:
+            ex, ey, an = cx, cy - r - 14, "center"
+    else:
+        _, x1, y1, x2, y2 = zona
+        a, b = pt(x1, y1)
+        c, d = pt(x2, y2)
+        g.redondo(a, b, c, d, p(10), "", color, ancho)
+        if resaltar in ("LB", "LT"):
+            ex, ey, an = x1 - 10, (y1 + y2) / 2, "e"
+        elif resaltar in ("RB", "RT"):
+            ex, ey, an = x2 + 10, (y1 + y2) / 2, "w"
+        else:
+            ex = ey = an = None
+    if an and etiqueta and resaltar not in COLOR:
+        cv.create_text(*pt(ex, ey), text=resaltar, anchor=an, fill=color, font=g.f_chip)
+
+
 class Guia:
     ANCHO, ALTO = 1280, 760          # medidas de diseño; se escalan para que quepa en la pantalla
 
@@ -383,91 +518,7 @@ class Guia:
     def dibujar_mando(self, senales):
         """El mando dibujado y una línea desde cada botón hasta lo que hace en esta página."""
         cv, p, g = self.cv, self.px, self.glifos
-        ox, oy = MANDO_X, MANDO_Y
-
-        def pt(x, y):
-            return p(ox + x), p(oy + y)
-
-        def caja(x1, y1, x2, y2, r, relleno, borde=""):
-            a, b = pt(x1, y1)
-            c, d = pt(x2, y2)
-            g.redondo(a, b, c, d, p(r), relleno, borde)
-
-        def circulo(cx, cy, r, relleno, borde="", ancho=1):
-            a, b = pt(cx - r, cy - r)
-            c, d = pt(cx + r, cy + r)
-            cv.create_oval(a, b, c, d, fill=relleno, outline=borde, width=ancho)
-
-        def curva(inicio, tramos, dx=0, dy=0):
-            puntos = [inicio]
-            for tramo in tramos:
-                b = bezier([puntos[-1]] + list(tramo))
-                puntos += [(b[i], b[i + 1]) for i in range(0, len(b), 2)]
-            return [c for x, y in puntos for c in pt(x + dx, y + dy)]
-
-        def poligono(puntos, relleno, borde="", ancho=1, suave=True):
-            cv.create_polygon([c for x, y in puntos for c in pt(x, y)], fill=relleno, outline=borde,
-                              width=ancho, smooth=suave)
-
-        def stick(cx, cy):
-            circulo(cx, cy, 34, "#c4c8cf")                       # hueco en la carcasa
-            circulo(cx, cy + 2, 29, "#15171b")                   # sombra del capuchón
-            circulo(cx, cy, 29, "#2b2e35", "#454a54", max(1, p(3)))   # capuchón con su anillo de goma
-            circulo(cx, cy, 17, "#23262c")                       # centro cóncavo
-            a, b = pt(cx - 25, cy - 25)
-            c, d = pt(cx + 25, cy + 25)
-            cv.create_arc(a, b, c, d, start=100, extent=70, style="arc", outline="#5d6370", width=max(1, p(2)))
-
-        # gatillos detrás y bumpers curvos sobre los hombros
-        caja(95, -14, 165, 24, 14, "#3a3e46", "#4a4f59")
-        caja(335, -14, 405, 24, 14, "#3a3e46", "#4a4f59")
-        poligono([(58, 46), (66, 30), (96, 18), (150, 12), (196, 14), (204, 26), (198, 32), (150, 28),
-                  (100, 34), (72, 46)], "#8d939d", "#a6abb4")
-        poligono([(442, 46), (434, 30), (404, 18), (350, 12), (304, 14), (296, 26), (302, 32), (350, 28),
-                  (400, 34), (428, 46)], "#8d939d", "#a6abb4")
-        # sombra, cuerpo blanco y brillo de arriba
-        cv.create_polygon(curva((70, 40), CONTORNO, 0, 9), fill="#07080a", outline="")
-        cv.create_polygon(curva((70, 40), CONTORNO), fill="#eceef1", outline="#c9cdd4", width=max(1, p(1.5)))
-        cv.create_polygon(curva((70, 40), BRILLO), fill="#f8f9fa", outline="")
-        # empuñaduras un poco más oscuras abajo
-        poligono([(30, 250), (60, 236), (100, 262), (104, 312), (70, 336), (30, 320), (16, 286)], "#e2e5e9",
-                 suave=True)
-        poligono([(470, 250), (440, 236), (400, 262), (396, 312), (430, 336), (470, 320), (484, 286)], "#e2e5e9",
-                 suave=True)
-        # sticks y cruceta sobre su disco
-        stick(125, 118)
-        stick(315, 205)
-        circulo(185, 205, 33, "#c4c8cf")
-        circulo(185, 207, 28, "#15171b")
-        circulo(185, 205, 28, "#3a3e46", "#4c515b", max(1, p(2)))
-        caja(177, 182, 193, 228, 4, "#2b2e35")
-        caja(162, 197, 208, 213, 4, "#2b2e35")
-        for x1, y1, x2, y2, x3, y3 in ((185, 186, 181, 191, 189, 191), (185, 224, 181, 219, 189, 219),
-                                       (166, 205, 171, 201, 171, 209), (204, 205, 199, 201, 199, 209)):
-            cv.create_polygon(*pt(x1, y1), *pt(x2, y2), *pt(x3, y3), fill="#6b717d", outline="")
-        # Back y Start: redondos, con su flecha, a los lados del botón guía
-        for cx, flecha in ((205, -1), (295, 1)):
-            circulo(cx, 112, 11, "#c4c8cf")
-            circulo(cx, 112, 9, "#9aa0aa", "#80868f")
-            cv.create_polygon(*pt(cx - 4 * flecha, 108), *pt(cx - 4 * flecha, 116), *pt(cx + 4 * flecha, 112),
-                              fill="#2b2e35", outline="")
-        # botón guía plateado con el anillo de luz (cuadrante del jugador 1 encendido)
-        circulo(250, 94, 27, "#c4c8cf")
-        a, b = pt(227, 71)
-        c, d = pt(273, 117)
-        for inicio, color in ((5, "#8a909a"), (95, LUZ), (185, "#8a909a"), (275, "#8a909a")):
-            cv.create_arc(a, b, c, d, start=inicio, extent=80, style="arc", outline=color, width=max(2, p(4)))
-        circulo(250, 94, 17, "#d9dde3", "#aeb3bc", max(1, p(1.5)))
-        circulo(246, 90, 7, "#eef0f3")
-        # A B X Y: botones de color en su hueco, con brillo
-        for letra, (cx, cy) in {"Y": (385, 86), "X": (353, 118), "B": (417, 118), "A": (385, 150)}.items():
-            circulo(cx, cy, 17, "#c4c8cf")
-            circulo(cx, cy + 1.5, 14.5, "#15171b")
-            circulo(cx, cy, 14.5, COLOR[letra])
-            a, b = pt(cx - 9, cy - 11)
-            c, d = pt(cx + 3, cy - 4)
-            cv.create_oval(a, b, c, d, fill=aclarar(COLOR[letra], 0.5), outline="")
-            cv.create_text(*pt(cx, cy + 1), text=letra, fill=OSCURO, font=g.f_letra)
+        dibujar_cuerpo(cv, p, g)
 
         # líneas y etiquetas, repartidas de arriba abajo a cada lado
         for lado in ("izq", "der"):

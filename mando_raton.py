@@ -93,6 +93,7 @@ REPETIR_CADA = 0.08
 TECLADO_ESPERA = 0.23     # repetición al moverse por el teclado (50 % más rápida, pedido 2026-10-27)
 TECLADO_CADA = 0.087
 TECLADO_ARRASTRE = 1600   # px/s con el stick derecho a fondo (mover el teclado)
+CONFIGURAR_MANTENER = 10.0   # s con Back + R3 apretados = configurar el mando (mini ventana)
 A_MANTENER = 0.6          # s con A quieta = abrir en pestaña nueva
 B_MANTENER = 1.0          # s con B = cerrar pestaña
 ESPERA_FOCO = 0.45        # s tras el clic: si el campo ya tenía el foco, abrir el teclado
@@ -378,6 +379,12 @@ class Mando(modo_juego.ModoJuego if modo_juego else SinJuego):
         self.teclado = Teclado(vibrar=lambda: vibrar(40, 20000))
         self.iniciar_juego()          # modo juego (solo con modo_juego.py)
         self.generico = MandoGenerico()
+        self.configurando = False   # la mini ventana está enseñándole los botones a un mando nuevo
+        self.config_desde = 0.0
+        self.apagando = None        # instante en que se le pidió a la mini ventana la animación de apagado
+        self.mando_id = None        # qué mando hay conectado (para avisar cuando llega uno nuevo)
+        self.ofrecidos = set()      # modelos a los que ya se ofreció configurarlos en esta sesión
+        self.retener_t = None       # Back + R3 apretados desde este instante
 
     # ----- utilidades -----
     def clic_en_campo(self, campo, margen=8):
@@ -730,19 +737,91 @@ class Mando(modo_juego.ModoJuego if modo_juego else SinJuego):
         except OSError:
             self.guia = None
 
+    def indicador_vivo(self):
+        return self.indicador is not None and self.indicador.poll() is None
+
+    def a_indicador(self, orden):
+        """Una orden para la mini ventana (CONECTADO, CONFIGURAR n, APAGAR)."""
+        if not self.indicador_vivo():
+            return False
+        try:
+            self.indicador.stdin.write(orden + chr(10))
+            self.indicador.stdin.flush()
+            return True
+        except (OSError, ValueError, AttributeError):
+            return False
+
+    def _leer_indicador(self, proceso):
+        """Hilo: lo que dice la mini ventana (CONFIG 1 / CONFIG 0)."""
+        try:
+            for linea in proceso.stdout:
+                if proceso is not self.indicador:
+                    continue
+                if linea.strip() == "CONFIG 0":
+                    self.configurando = False
+                elif linea.strip() == "CONFIG 1":
+                    self.configurando = True
+        except (OSError, ValueError):
+            pass
+
     def mostrar_indicador(self, ver):
-        vivo = self.indicador is not None and self.indicador.poll() is None
+        vivo = self.indicador_vivo()
+        if ver and vivo and self.apagando is not None:
+            self.indicador.terminate()      # volvieron a encender a mitad de la animación de apagado
+            vivo = False
         if ver and not vivo:
+            self.apagando = None
             try:
                 self.indicador = subprocess.Popen(
                     rutas.orden("--indicador", "indicador_mando.py") + ["--padre", str(os.getpid())],
-                    stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                    stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True,
                     stderr=subprocess.DEVNULL, creationflags=0x08000000)
+                threading.Thread(target=self._leer_indicador, args=(self.indicador,), daemon=True).start()
             except OSError:
                 self.indicador = None
         elif not ver and vivo:
-            self.indicador.terminate()
+            # pausa: el anillo gira tres veces (como al apagar una Xbox 360) y la mini ventana se cierra sola
+            self.configurando = False
+            if self.apagando is None and self.a_indicador("APAGAR"):
+                self.apagando = time.monotonic()
+            elif self.apagando is None:
+                self.indicador.terminate()
+                self.indicador = None
+
+    def revisar_indicador(self, ahora):
+        """Cierra de verdad la mini ventana si la animación de apagado se alargó, y suelta el modo
+        "configurando" si la mini ventana murió o se colgó."""
+        if self.apagando is not None and (ahora - self.apagando > 4 or not self.indicador_vivo()):
+            if self.indicador_vivo():
+                self.indicador.terminate()
             self.indicador = None
+            self.apagando = None
+        if self.configurando and (not self.indicador_vivo() or ahora - self.config_desde > 300):
+            self.configurando = False
+
+    def mando_nuevo(self):
+        """Cada vez que llega un mando: animación del anillo y, si es un genérico que no conocemos,
+        ofrecer enseñarle los botones (se ofrece una vez por modelo y sesión)."""
+        if PUERTO is not None:
+            ident = ("x", PUERTO)
+        else:
+            ident = ("j", self.generico.modelo, self.generico.indice)
+        if ident == self.mando_id:
+            return
+        self.mando_id = ident
+        if not self.activo or self.apagando is not None:
+            return
+        if ident[0] == "j" and not self.generico.conocido and ident[1] not in self.ofrecidos:
+            self.ofrecidos.add(ident[1])
+            self.empezar_config(self.generico.indice, "auto")
+        else:
+            self.a_indicador("CONECTADO")
+
+    def empezar_config(self, indice, modo):
+        if indice is not None and self.a_indicador("CONFIGURAR %d %s" % (indice, modo)):
+            self.configurando = True
+            self.config_desde = time.monotonic()
+            vibrar(60, 20000)
 
     # ----- bucle -----
     def leer_mando(self, estado):
@@ -786,7 +865,9 @@ class Mando(modo_juego.ModoJuego if modo_juego else SinJuego):
                 proximo_juego = ahora + 0.5
                 juego_al_frente = self.juego_al_frente()
 
+            self.revisar_indicador(ahora)
             if not self.leer_mando(estado):
+                self.mando_id = None
                 self.soltar_todo()  # mando desconectado
                 self.soltar_juego()
                 self.previo = self.consumidos = 0
@@ -796,8 +877,31 @@ class Mando(modo_juego.ModoJuego if modo_juego else SinJuego):
             g = estado.Gamepad
             botones = (g.wButtons | (RT if g.bRightTrigger > UMBRAL_GATILLO else 0)
                        | (LT if g.bLeftTrigger > UMBRAL_GATILLO else 0))
+            self.mando_nuevo()
+            if self.configurando:
+                # la mini ventana le está enseñando los botones al mando: aquí no se hace nada
+                self.previo = self.consumidos = botones
+                self.retener_t = None
+                time.sleep(periodo)
+                continue
             nuevos = botones & ~self.previo
             soltados = self.previo & ~botones
+
+            # Back + R3 mantenidos 10 s: configurar el mando (mandos que no son de Xbox)
+            if self.activo and (botones & BACK) and (botones & R3):
+                if self.retener_t is None:
+                    self.retener_t = ahora
+                elif (ahora - self.retener_t >= CONFIGURAR_MANTENER and PUERTO is None
+                      and self.generico.indice is not None):
+                    self.retener_t = ahora + 1e9      # una sola vez por pulsación
+                    self.cerrar_guia()                 # la guía se abrió con el primer toque
+                    self.empezar_config(self.generico.indice, "manual")
+                    self.soltar_todo()
+                    self.consumidos = botones
+                    self.previo = botones
+                    continue
+            else:
+                self.retener_t = None
 
             # Back + Start: pausar / reanudar (en cualquier modo)
             if (botones & BACK) and (botones & START) and (nuevos & (BACK | START)):

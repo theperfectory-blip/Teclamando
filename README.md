@@ -22,12 +22,12 @@ Si dejaste marcado *Arrancar con Windows*, queda esperando cada vez que inicias 
 | B | atrás |
 | Start | Enter |
 | L3 | teclado en pantalla (también se abre solo al hacer clic en un campo de texto) |
-| Back + R3 | guía con todos los botones |
+| Back + R3 | guía con todos los botones (mantenido 10 s: configurar un mando que no es de Xbox) |
 
 ## Requisitos
 
 - Windows 10 u 11 de 64 bits.
-- Mando XInput (Xbox 360, Xbox One/Series y compatibles). Los de PlayStation y genéricos USB funcionan por DirectInput; si un botón no corresponde, usa *Configurar otro mando* en el menú Inicio.
+- Mando XInput (Xbox 360, Xbox One/Series y compatibles). Los de PlayStation y genéricos USB funcionan por DirectInput; si un botón no corresponde, usa *Configurar otro mando* en el menú Inicio o mantén Back + R3 10 segundos. Un mando genérico nuevo se ofrece configurar solo.
 
 ## Privacidad
 
