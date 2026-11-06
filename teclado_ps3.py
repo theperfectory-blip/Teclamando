@@ -91,6 +91,9 @@ class INPUT(ctypes.Structure):
 
 UNICODE, KEYUP, EXTENDED = 0x4, 0x2, 0x1
 VK_BACK, VK_RETURN, VK_LEFT, VK_RIGHT = 0x08, 0x0D, 0x25, 0x27
+VK_SPACE, VK_SHIFT = 0x20, 0x10
+# modificadores como en un teclado normal: se arman con A y valen para la tecla siguiente
+MODS = {"win": (0x5B, "Win", EXTENDED), "ctrl": (0xA2, "Ctrl", 0), "alt": (0xA4, "Alt", 0)}
 
 
 def _evento(vk=0, scan=0, flags=0):
@@ -118,6 +121,24 @@ def escribir(texto):
 def pulsar(vk, veces=1):
     f = EXTENDED if vk in (VK_LEFT, VK_RIGHT) else 0
     _enviar([e for _ in range(veces) for e in (_evento(vk, 0, f), _evento(vk, 0, f | KEYUP))])
+
+
+def combo(mods, vk, shift=False):
+    """Pulsa vk con los modificadores apretados (Win+E, Ctrl+C, Alt+Tab...) y los suelta."""
+    abajo = [(MODS[m][0], MODS[m][2]) for m in mods] + ([(VK_SHIFT, 0)] if shift else [])
+    ev = [_evento(v, 0, f) for v, f in abajo]
+    f = EXTENDED if vk in (VK_LEFT, VK_RIGHT, 0x26, 0x28) else 0
+    ev += [_evento(vk, 0, f), _evento(vk, 0, f | KEYUP)]
+    ev += [_evento(v, 0, f2 | KEYUP) for v, f2 in reversed(abajo)]
+    _enviar(ev)
+
+
+def vk_de(letra):
+    """(código de tecla, necesita Mayús) de un carácter, según la distribución del teclado."""
+    r = user32.VkKeyScanW(ord(letra))
+    if r == -1:
+        return None, False
+    return r & 0xFF, bool(r & 0x100)
 
 
 # ---------- Sonidos (sintetizados, parecidos a los del teclado de la PS3) ----------
@@ -336,7 +357,8 @@ CAPAS = {
         [(c, None, 1) for c in "qwertyuiop"] + [("´", "tilde", 1), ("@", None, 1)],
         [(c, None, 1) for c in "asdfghjklñ"] + [("Enter ↵", "enter", 2)],
         [("⇧", "mayus", 1)] + [(c, None, 1) for c in "zxcvbnm,.-/"],
-        [("?123  LT", "capa", 2), ("espacio", "espacio", 8), ("?", None, 1), ("!", None, 1)],
+        [("?123  LT", "capa", 2), ("espacio", "espacio", 5), ("?", None, 1), ("!", None, 1),
+         ("Win", "mod_win", 1), ("Ctrl", "mod_ctrl", 1), ("Alt", "mod_alt", 1)],
     ],
     # símbolos a la izquierda y los números como teclado numérico a la derecha (columnas 8 a 11)
     "simbolos": [
@@ -344,12 +366,14 @@ CAPAS = {
         [(c, None, 1) for c in "\"'#$%&=~456-"],
         [(c, None, 1) for c in "{}<>_^°€123+"],
         [(c, None, 1) for c in r":;@/\*|ü0.,"] + [("↵", "enter", 1)],
-        [("abc  LT", "capa", 2), ("espacio", "espacio", 9), ("´", "tilde", 1)],
+        [("abc  LT", "capa", 2), ("espacio", "espacio", 5), ("´", "tilde", 1),
+         ("Win", "mod_win", 1), ("Ctrl", "mod_ctrl", 1), ("Alt", "mod_alt", 1)],
     ],
 }
 COL_NUMERICO = 8          # en la capa de símbolos, desde esta columna empieza el teclado numérico
 CON_TILDE = {"a": "á", "e": "é", "i": "í", "o": "ó", "u": "ú",
              "A": "Á", "E": "É", "I": "Í", "O": "Ó", "U": "Ú"}
+MODS_ACC = {"mod_" + m for m in MODS}
 SUG = -1   # índice de la fila de sugerencias
 
 
@@ -419,6 +443,7 @@ class Teclado:
 
         self.capa = "letras"
         self.fila, self.col = 2, 4              # empieza en la "g"
+        self.mods = set()                       # Win / Ctrl / Alt armados para la tecla siguiente
         self.mayus = 0                          # 0 no, 1 una letra, 2 bloqueada
         self.volver = None                      # (fila, col) a la que volver tras elegir sugerencia
         self.tilde = False
@@ -589,7 +614,8 @@ class Teclado:
                 x1, y1, x2, y2 = self._caja(f, i)
                 sel = self.fila == f and self.col == i
                 numerico = self.capa == "simbolos" and self._inicio_col(f, i) >= COL_NUMERICO
-                encendida = (accion == "mayus" and self.mayus == 1) or (accion == "tilde" and self.tilde)
+                encendida = ((accion == "mayus" and self.mayus == 1) or (accion == "tilde" and self.tilde)
+                             or (accion in MODS_ACC and accion[4:] in self.mods))
                 bloq = accion == "mayus" and self.mayus == 2
                 texto = self._con_mayus(etq) if accion is None else etq
                 if accion == "mayus":
@@ -673,7 +699,33 @@ class Teclado:
         self.sug = min(self.sug, max(0, len(self.sugerencias) - 1))
         self._dibujar()
 
+    def _con_modificador(self, vk, shift=False):
+        """Si hay Win / Ctrl / Alt armados manda la combinación y devuelve True."""
+        if not self.mods:
+            return False
+        shift = shift or self.mayus > 0
+        combo(sorted(self.mods), vk, shift)
+        self.mods.clear()
+        if self.mayus == 1:
+            self.mayus = 0
+        self.palabra, self.anterior = "", ""
+        self._actualizar()
+        return True
+
+    def _c_modificador(self, m):
+        if m in self.mods:                    # segunda vez: Win suelto = menú Inicio, como en un teclado
+            self.mods.discard(m)
+            if m == "win" and not self.mods:
+                _enviar([_evento(0x5B, 0, EXTENDED), _evento(0x5B, 0, EXTENDED | KEYUP)])
+        else:
+            self.mods.add(m)
+        self._dibujar()
+
     def _escribir_letra(self, etq):
+        if self.mods:
+            vk, sh = vk_de(self._con_mayus(etq) if etq.isalpha() else etq)
+            if vk is not None and self._con_modificador(vk, sh):
+                return
         letra = self._con_mayus(etq)
         if self.tilde:
             letra = CON_TILDE.get(letra, letra)
@@ -709,10 +761,14 @@ class Teclado:
     def _accion(self, accion, etq):
         if accion is None:
             self._escribir_letra(etq)
+        elif accion in MODS_ACC:
+            self._c_modificador(accion[4:])
         elif accion == "borrar":
             self._c_borrar()
         elif accion == "espacio":
             self._c_espacio()
+        elif accion == "enter" and self._con_modificador(VK_RETURN):
+            pass
         elif accion == "enter":
             self._terminar_palabra("\n")
             pulsar(VK_RETURN)
@@ -857,6 +913,7 @@ class Teclado:
             self.raiz.withdraw()
             self.visible = False
             self.a_t = None
+            self.mods.clear()
 
     def _c_mover(self, d):
         filas = self._filas()
@@ -913,6 +970,8 @@ class Teclado:
             self._escribir_letra(self._tecla_actual()[0])
 
     def _c_borrar(self):
+        if self._con_modificador(VK_BACK):
+            return
         pulsar(VK_BACK)
         self._frase_borrar()
         if not self.palabra:
@@ -921,10 +980,14 @@ class Teclado:
         self._actualizar()
 
     def _c_espacio(self):
+        if self._con_modificador(VK_SPACE):
+            return
         self._insertar(" ")
 
     def _c_cursor(self, d):
         """LB / RB: mover el cursor del texto una letra."""
+        if self._con_modificador(VK_LEFT if d == "izq" else VK_RIGHT):
+            return                            # p. ej. Win + ← ajusta la ventana, Ctrl + ← salta de palabra
         pulsar(VK_LEFT if d == "izq" else VK_RIGHT)
         self.pos = max(0, min(len(self.frase), self.pos + (-1 if d == "izq" else 1)))
         # la palabra en el cursor sale de la frase (si el cursor queda al final de una palabra)
